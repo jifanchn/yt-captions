@@ -8,10 +8,10 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch captions
+      - name: Fetch
         run: |
           pip3 install youtube-transcript-api
-          python3 << 'EOF'
+          python3 -c '
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -19,24 +19,27 @@ video_id = "cBdlceqzaUQ"
 ytt = YouTubeTranscriptApi()
 
 try:
-    transcript = ytt.fetch(video_id, languages=["zh-Hans","zh-CN","zh-TW","en"])
-except:
+    t = ytt.fetch(video_id, languages=["zh-Hans","zh-CN","zh-TW","en"])
+except Exception as e:
+    print(f"Error: {e}")
     tlist = ytt.list(video_id)
-    transcript = next(iter(tlist)).fetch()
+    if tlist:
+        t = next(iter(tlist)).fetch()
+    else:
+        raise Exception("No transcripts")
 
 result = {
     "video_id": video_id,
-    "transcript": [{"start": e.start, "text": e.text} for e in transcript],
-    "full_text": " ".join(e.text for e in transcript)
+    "full_text": " ".join(e.text for e in t)
 }
 
 with open("output.json", "w") as f:
     json.dump(result, f, indent=2, ensure_ascii=False)
 
 print(result["full_text"][:5000])
-print(f"\n---\nTotal characters: {len(result['full_text'])}")
-EOF
-      - name: Upload result
+print(f"\nTotal: {len(result['full_text'])} chars")
+'
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: transcript
