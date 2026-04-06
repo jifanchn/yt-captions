@@ -1,12 +1,6 @@
 name: Fetch YouTube Captions
 
 on:
-  workflow_dispatch:
-    inputs:
-      video_id:
-        description: 'YouTube Video ID'
-        required: true
-        default: 'cBdlceqzaUQ'
   push:
     branches: [ main ]
 
@@ -14,74 +8,36 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Python and deps
+      - name: Fetch captions
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
           pip3 install youtube-transcript-api
-      - name: Fetch transcript
-        env:
-          VIDEO_ID: ${{ github.event.inputs.video_id || 'cBdlceqzaUQ' }}
-        run: |
-          python3 << 'PYEOF'
-import json, sys
+          python3 << 'EOF'
+import json
 from youtube_transcript_api import YouTubeTranscriptApi
 
-vid = sys.argv[1] if len(sys.argv) > 1 else "cBdlceqzaUQ"
+video_id = "cBdlceqzaUQ"
 ytt = YouTubeTranscriptApi()
 
 try:
-    t = ytt.fetch(vid, languages=["zh-Hans","zh-CN","zh-TW","en"])
-except Exception as e:
-    print(f"Primary fetch failed: {e}")
-    tlist = ytt.list(vid)
-    if tlist:
-        first = next(iter(tlist))
-        t = first.fetch()
-    else:
-        print("No transcripts available")
-        sys.exit(1)
+    transcript = ytt.fetch(video_id, languages=["zh-Hans","zh-CN","zh-TW","en"])
+except:
+    tlist = ytt.list(video_id)
+    transcript = next(iter(tlist)).fetch()
 
 result = {
-    "video_id": vid,
-    "entries": [{"start": e.start, "text": e.text} for e in t],
-    "full_text": " ".join(e.text for e in t)
+    "video_id": video_id,
+    "transcript": [{"start": e.start, "text": e.text} for e in transcript],
+    "full_text": " ".join(e.text for e in transcript)
 }
 
-with open("transcript.json", "w") as f:
-    json.dump(result, f, ensure_ascii=False, indent=2)
+with open("output.json", "w") as f:
+    json.dump(result, f, indent=2, ensure_ascii=False)
 
 print(result["full_text"][:5000])
-print(f"\n... Total: {len(result['full_text'])} chars")
-PYEOF
-          python3 -c "
-import json, sys
-from youtube_transcript_api import YouTubeTranscriptApi
-
-vid = '$VIDEO_ID'
-ytt = YouTubeTranscriptApi()
-
-try:
-    t = ytt.fetch(vid, languages=['zh-Hans','zh-CN','zh-TW','en'])
-except:
-    tlist = ytt.list(vid)
-    t = next(iter(tlist)).fetch()
-
-result = {
-    'video_id': vid,
-    'entries': [{'start': e.start, 'text': e.text} for e in t],
-    'full_text': ' '.join(e.text for e in t)
-}
-
-with open('transcript.json', 'w') as f:
-    json.dump(result, f, ensure_ascii=False, indent=2)
-
-print(result['full_text'][:5000])
-print(f'\n... Total: {len(result[\"full_text\"])} chars')
-"
+print(f"\n---\nTotal characters: {len(result['full_text'])}")
+EOF
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
           name: transcript
-          path: transcript.json
-          retention-days: 1
+          path: output.json
