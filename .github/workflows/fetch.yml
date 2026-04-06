@@ -7,6 +7,8 @@ on:
         description: 'YouTube Video ID'
         required: true
         default: 'cBdlceqzaUQ'
+  push:
+    branches: [ main ]
 
 jobs:
   fetch:
@@ -15,17 +17,17 @@ jobs:
       - name: Install Python and deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip python3-requests
+          sudo apt-get install -y python3-pip
           pip3 install youtube-transcript-api
       - name: Fetch transcript
         env:
-          VIDEO_ID: ${{ github.event.inputs.video_id }}
+          VIDEO_ID: ${{ github.event.inputs.video_id || 'cBdlceqzaUQ' }}
         run: |
-          python3 -c '
+          python3 << 'PYEOF'
 import json, sys
 from youtube_transcript_api import YouTubeTranscriptApi
 
-vid = sys.argv[1]
+vid = sys.argv[1] if len(sys.argv) > 1 else "cBdlceqzaUQ"
 ytt = YouTubeTranscriptApi()
 
 try:
@@ -49,9 +51,34 @@ result = {
 with open("transcript.json", "w") as f:
     json.dump(result, f, ensure_ascii=False, indent=2)
 
-print(result["full_text"][:3000])
-print(f"\n... Total: {len(result["full_text"])} chars")
-          ' "$VIDEO_ID"
+print(result["full_text"][:5000])
+print(f"\n... Total: {len(result['full_text'])} chars")
+PYEOF
+          python3 -c "
+import json, sys
+from youtube_transcript_api import YouTubeTranscriptApi
+
+vid = '$VIDEO_ID'
+ytt = YouTubeTranscriptApi()
+
+try:
+    t = ytt.fetch(vid, languages=['zh-Hans','zh-CN','zh-TW','en'])
+except:
+    tlist = ytt.list(vid)
+    t = next(iter(tlist)).fetch()
+
+result = {
+    'video_id': vid,
+    'entries': [{'start': e.start, 'text': e.text} for e in t],
+    'full_text': ' '.join(e.text for e in t)
+}
+
+with open('transcript.json', 'w') as f:
+    json.dump(result, f, ensure_ascii=False, indent=2)
+
+print(result['full_text'][:5000])
+print(f'\n... Total: {len(result[\"full_text\"])} chars')
+"
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
