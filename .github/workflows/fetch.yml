@@ -1,6 +1,7 @@
 name: Fetch YouTube Captions
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -8,33 +9,39 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install and fetch
         run: |
-          pip3 install youtube-transcript-api
+          python -m pip install --upgrade pip
+          python -m pip install youtube-transcript-api
           echo "=== FETCHING TRANSCRIPT ==="
-          python3 << 'EOF'
-import json
-from youtube_transcript_api import YouTubeTranscriptApi
+          python << 'EOF'
+          import json
+          from youtube_transcript_api import YouTubeTranscriptApi
 
-video_id = "cBdlceqzaUQ"
-ytt = YouTubeTranscriptApi()
+          video_id = "cBdlceqzaUQ"
+          ytt = YouTubeTranscriptApi()
 
-try:
-    t = ytt.fetch(video_id, languages=["zh-Hans","zh-CN","zh-TW","en"])
-except Exception as e:
-    print(f"Primary fetch failed: {e}")
-    tlist = ytt.list(video_id)
-    if tlist:
-        t = next(iter(tlist)).fetch()
-    else:
-        print("ERROR: No transcripts available")
-        exit(1)
+          try:
+              t = ytt.fetch(video_id, languages=["zh-Hans", "zh-CN", "zh-TW", "en"])
+          except Exception as e:
+              print(f"Primary fetch failed: {e}")
+              tlist = ytt.list(video_id)
+              if tlist:
+                  t = next(iter(tlist)).fetch()
+              else:
+                  print("ERROR: No transcripts available")
+                  exit(1)
 
-full_text = " ".join(e.text for e in t)
-print(f"Video ID: {video_id}")
-print(f"Total entries: {len(t)}")
-print(f"Total characters: {len(full_text)}")
-print("\n=== TRANSCRIPT START ===")
-print(full_text)
-print("=== TRANSCRIPT END ===")
-EOF
+          full_text = " ".join(e.text for e in t)
+          print(f"Video ID: {video_id}")
+          print(f"Total entries: {len(t)}")
+          print(f"Total characters: {len(full_text)}")
+          print("\n=== TRANSCRIPT START ===")
+          print(full_text)
+          print("=== TRANSCRIPT END ===")
+          EOF
